@@ -48,11 +48,11 @@ let _ = loop (* silence OCaml's unused-value warning about [loop] *)
    replaced with the following code, which exploits the functions
    [lexer_lexbuf_to_supplier] and [loop_handle] offered by Menhir. *)
 
-let succeed (v : int) =
+let succeed (_ : Ast.value) =
   (* The parser has succeeded and produced a semantic value. Print it. *)
-  Printf.printf "%d\n%!" v
+  Printf.printf "%d\n%!" 10 (*@@v*)
 
-let fail lexbuf (_ : int I.checkpoint) =
+let fail lexbuf (_ : Ast.value I.checkpoint) =
   (* The parser has suspended itself because of a syntax error. Stop. *)
   Printf.fprintf stderr
     "At offset %d: syntax error.\n%!"
@@ -69,7 +69,7 @@ let loop lexbuf result =
 let process (line : string) =
   let lexbuf = from_string line in
   try
-    loop lexbuf (Parser.Incremental.main lexbuf.lex_curr_p)
+    loop lexbuf (Parser.Incremental.dataLiteral lexbuf.lex_curr_p)
   with
   | Lexer.Error msg ->
       Printf.fprintf stderr "%s%!" msg

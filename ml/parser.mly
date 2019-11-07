@@ -1,35 +1,11 @@
-%token <int> INT
-%token PLUS MINUS TIMES DIV
-%token LPAREN RPAREN
-%token EOL
+%{
+    module A = Ast
+%}
 
-%left PLUS MINUS        /* lowest precedence */
-%left TIMES DIV         /* medium precedence */
-%nonassoc UMINUS        /* highest precedence */
-
-%start <int> main
-
-%%
-
-main:
-| e = expr EOL
-    { e }
-
-expr:
-| i = INT
-    { i }
-| LPAREN e = expr RPAREN
-    { e }
-| e1 = expr PLUS e2 = expr
-    { e1 + e2 }
-| e1 = expr MINUS e2 = expr
-    { e1 - e2 }
-| e1 = expr TIMES e2 = expr
-    { e1 * e2 }
-| e1 = expr DIV e2 = expr
-    { e1 / e2 }
-| MINUS e = expr %prec UMINUS
-    { - e }
+%token EOF
+%token NULL "null" FALSE "false" TRUE "true"
+%token <float>NUMBER
+%token <string>STRING
 
 /*
 cribbed from https://github.com/Agoric/Jessie/blob/master/src/tinyses.js
@@ -42,7 +18,18 @@ cribbed from https://github.com/Agoric/Jessie/blob/master/src/tinyses.js
     # TODO: module syntax
     start ::= body EOF                                     ${(b,_) => (..._) => ['script', b]};
 
-    dataLiteral ::=  "null" / "false" / "true" / NUMBER / STRING;
+%start <block> body @@@
+*/
+%start <Ast.value> dataLiteral
+
+%%
+
+dataLiteral :
+  | "null" { Null }
+  | "false" { Bool false } | "true" { Bool true }
+  | n = NUMBER { Number n }
+  | s = STRING { String s }
+(*
     identName ::= IDENT / RESERVED_WORD;
     useVar ::= IDENT                                       ${id => ['use',id]};
     defVar ::= IDENT                                       ${id => ['def',id]};
@@ -91,7 +78,7 @@ cribbed from https://github.com/Agoric/Jessie/blob/master/src/tinyses.js
     propName ::=  identName / STRING / NUMBER;
     quasiExpr ::=
       QUASI_ALL                                            ${q => ['quasi',[q]]}
-    / QUASI_HEAD (expr (QUASI_MID expr)*)? QUASI_TAIL      ${(h,ms,t) => ['quasi',qunpack(h,ms,t)]};
+    / QUASI_HEAD (expr (QUASI_MID expr)* )? QUASI_TAIL      ${(h,ms,t) => ['quasi',qunpack(h,ms,t)]};
     later ::= NO_NEWLINE "!";
     # No "new", "super", or MetaProperty. Without "new" we don't need
     # separate MemberExpr and CallExpr productions.
@@ -131,10 +118,12 @@ cribbed from https://github.com/Agoric/Jessie/blob/master/src/tinyses.js
     # TODO: Need to be able to write (1,array[i])(args), which
     # either requires that we readmit the comma expression, or
     # that we add a weird special case to the grammar.
-    expr ::=
-      lValue assignOp expr                                 ${(lv,op,rv) => [op,lv,rv]}
-    / arrow
-    / orElseExpr;
+*@@@)
+expr:
+    | lv = lValue op = assignOp rv = expr                  { Assign op lv rv }
+    | e = arrow { e }
+    | e = orElseExpr { e }
+(@@*
     # lValue is only useVar or elementExpr in TinySES.
     # Include only elementExpr from fieldExpr to avoid mutating
     # non-number-named properties.
@@ -143,12 +132,13 @@ cribbed from https://github.com/Agoric/Jessie/blob/master/src/tinyses.js
     # TODO: re-allow assignment to statically named fields,
     # since it is useful during initialization and prevented
     # thereafter by mandatory tamper-proofing.
-    lValue ::= elementExpr / useVar;
-    elementExpr ::=
-      primaryExpr "[" indexExpr "]"                        ${(pe,_,e,_2) => ['index',pe,e]}
-    / primaryExpr later "[" indexExpr "]"                  ${(pe,_,_2,e,_3) => ['indexLater',pe,e]};
-    fieldExpr ::=
-      primaryExpr "." identName                            ${(pe,_,id) => ['get',pe,id]}
+*@@@)
+    lValue : elementExpr | useVar
+    elementExpr :
+      primaryExpr delimited("[", indexExpr, "]")           ${(pe,_,e,_2) => ['index',pe,e]}
+    | primaryExpr later delimited("[", indexExpr, "]")     ${(pe,_,_2,e,_3) => ['indexLater',pe,e]};
+    fieldExpr :
+      primaryExpr DOT identName                            ${(pe,_,id) => ['get',pe,id]}
     / primaryExpr later identName                          ${(pe,_,id) => ['getLater',pe,id]}
     / elementExpr;
     # No bitwise operators
@@ -166,8 +156,10 @@ cribbed from https://github.com/Agoric/Jessie/blob/master/src/tinyses.js
     # flow-of-control statements.
     # The expr production must go last, so PEG's prioritized choice will
     # interpret {} as a block rather than an expression.
-    statement ::=
-      block
+*@@@)
+    statement :
+    | b = block { b }
+(@@*
     / "if" "(" expr ")" block "else" block                 ${(_,_2,c,_3,t,_4,e) => ['if',c,t,e]}
     / "if" "(" expr ")" block                              ${(_,_2,c,_3,t) => ['if',c,t]}
     / "for" "(" declaration expr? ";" expr? ")" block      ${(_,_2,d,c,_3,i,_4,b) => ['for',d,c,i,b]}
@@ -204,8 +196,10 @@ cribbed from https://github.com/Agoric/Jessie/blob/master/src/tinyses.js
     caseLabel ::=
       "case" expr ":"                                      ${(_,e) => ['case', e]}
     / "default" ":"                                        ${(_,_2) => ['default']};
-    block ::= "{" body "}"                                 ${(_,b,_2) => ['block', b]};
-    body ::= (statement / declaration)*;
+*@@@)
+    block : "{" parts = body "}"                         { parts }
+    body : parts = list(s = statement { Left s } | d = declaration { Right d } ) { parts }
+(@@*
     functionExpr ::=
       "function" defVar? "(" param ** "," ")" block        ${(_,n,_2,p,_3,b) => ['functionExpr',n,p,b]};
     functionDecl ::=
@@ -215,4 +209,4 @@ cribbed from https://github.com/Agoric/Jessie/blob/master/src/tinyses.js
     / identGet propName "(" ")" block                      ${(_,n,_2,_3,b) => ['getter',n,[],b]}
     / identSet propName "(" param ")" block                ${(_,n,_2,p,_3,b) => ['setter',n,[p],b]};
   `;
-*/
+*)
