@@ -1,0 +1,17 @@
+;; https://dune.build
+;; https://gitlab.inria.fr/fpottier/menhir/blob/master/demos/calc-incremental-dune/dune
+
+(ocamllex
+  (modules lexer)
+)
+
+(menhir
+  (modules parser)
+  (flags ("--table"))
+)
+
+(executable
+ (name calc)
+ (libraries menhirLib)
+)
+ 
