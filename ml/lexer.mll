@@ -46,3 +46,53 @@ and token = parse
 | _
     { raise (Error (Printf.sprintf "At offset %d: unexpected character.\n" (Lexing.lexeme_start lexbuf))) }
 
+/*
+cribbed from https://github.com/Agoric/Jessie/blob/master/src/tinyses.js
+96557ee on Aug 16, 2018
+
+  const tinyses = bnf`
+
+    # TODO: Error if whitespace includes newline
+    NO_NEWLINE ::= ;
+    # TODO: quasiliterals aka template literals
+    QUASI_ALL ::= ${() => FAIL};
+    QUASI_HEAD ::= ${() => FAIL};
+    QUASI_MID ::= ${() => FAIL};
+    QUASI_TAIL ::= ${() => FAIL};
+    # Omit "async", "arguments", and "eval" from IDENT in TinySES even
+    # though ES2017 considers them in IDENT.
+    RESERVED_WORD ::=
+      KEYWORD / RESERVED_KEYWORD / FUTURE_RESERVED_WORD
+    / "null" / "false" / "true"
+    / "async" / "arguments" / "eval";
+    KEYWORD ::=
+      "break"
+    / "case" / "catch" / "const" / "continue"
+    / "debugger" / "default"
+    / "else" / "export"
+    / "finally" / "for" / "function"
+    / "if" / "import"
+    / "return"
+    / "switch"
+    / "throw" / "try" / "typeof"
+    / "void"
+    / "while";
+    # Unused by TinySES but enumerated here, in order to omit them
+    # from the IDENT token.
+    RESERVED_KEYWORD ::=
+      "class"
+    / "delete" / "do"
+    / "extends"
+    / "in" / "instanceof"
+    / "new"
+    / "super"
+    / "this"
+    / "var"
+    / "with"
+    / "yield";
+    FUTURE_RESERVED_WORD ::=
+      "await" / "enum"
+    / "implements" / "package" / "protected"
+    / "interface" / "private" / "public";
+
+*/
