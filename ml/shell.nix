@@ -14,6 +14,6 @@ in pkgs.stdenv.mkDerivation {
     rlwrap
     ocamlformat
     ] ++ (with ocamlPackages; [
-      ocaml ocamlbuild findlib utop core camomile zarith
+      ocaml ocamlbuild findlib utop core camomile zarith dune menhir
   ]);
 }
